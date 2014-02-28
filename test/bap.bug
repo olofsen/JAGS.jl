@@ -1,0 +1,24 @@
+model {
+	for (i in 1:NOBS) {
+	  DV[i] ~ dnorm(mui[ID[i]],terr)
+	}
+
+	for (i in 1:NID) {
+	  mui[i] ~ dnorm(mu,terrmu)
+	}
+
+	mu ~ dnorm(0,1e-6)
+
+	terrmu ~ dgamma(1e-3,1e-3)
+	w2mu <- 1/terrmu
+
+	terr ~ dgamma(1e-3,1e-3)
+	s2 <- 1/terr
+
+	vr <- w2mu+s2
+	sd <- sqrt(vr)
+	lloa <- mu - 1.96*sd
+	uloa <- mu + 1.96*sd
+
+	tau <- w2mu/vr
+}
