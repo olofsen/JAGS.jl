@@ -1,4 +1,4 @@
-JAGS: A Julia interface to JAGS
+JAGS.jl: A Julia interface to JAGS
 
 The package provides a shared library as an interface between Julia
 and JAGS, just like "rjags".  The script "lib/make.sh" should be run
@@ -23,6 +23,10 @@ are created in the example using package SixelGraphics, which is
 admittedly obscure, but handy with some terminals. See "example.png",
 or the ASCIIPlots version.
 
-Installation:  
-Pkg.clone("git://github.com/olofsen/JAGS.jl")  
-Pkg.clone("git://github.com/olofsen/SixelGraphics.jl")
+Installation:
+<ul>
+<li>Pkg.clone("git://github.com/olofsen/JAGS.jl")</li>
+<li>Pkg.clone("git://github.com/olofsen/SixelGraphics.jl")</li>
+<li>Install libltdl, development version with headers</li>
+<li>Run lib/make.sh</li>
+</ul>
