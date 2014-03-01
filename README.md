@@ -20,7 +20,8 @@ this may lead to erroneous results and crashes.
 
 Basic statistics are calculated using "coef" and some simple graphs
 are created in the example using package SixelGraphics, which is
-admittedly obscure, but handy with some terminals (see "example.png").
+admittedly obscure, but handy with some terminals. See "example.png",
+or the ASCIIPlots version.
 
 Installation:  
 Pkg.clone("git://github.com/olofsen/JAGS.jl")  
