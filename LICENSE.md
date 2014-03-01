@@ -1,4 +1,4 @@
-JAGS: A Julia interface to JAGS
+JAGS.jl: A Julia interface to JAGS
 
 Copyright (C) 2014 Erik Olofsen.
 
