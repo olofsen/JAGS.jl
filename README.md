@@ -28,5 +28,5 @@ Installation:
 <li>Pkg.clone("git://github.com/olofsen/JAGS.jl")</li>
 <li>Pkg.clone("git://github.com/olofsen/SixelGraphics.jl")</li>
 <li>Install libltdl, development version with headers</li>
-<li>Run lib/make.sh</li>
+<li>Run make.sh in lib</li>
 </ul>
