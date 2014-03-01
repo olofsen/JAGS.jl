@@ -19,7 +19,7 @@ initialize(jm)
 update(jm,1000)
 set_monitors(jm,["uloa" "mu" "lloa"], thin=100)
 
-update(jm,6000)
+update(jm,6000) # considering resolution
 
 println("\nStatistics of the monitored values:")
 sm = coef(jm)
