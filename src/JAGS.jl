@@ -153,6 +153,7 @@ function set_monitors(jm::JAGSModel, names::Array{ASCIIString}; thin=1)
   status::Bool
   if jm.status!=:model_initialized; return false; end
   status = ccall( (:set_monitors, shlib), Bool, (Ptr{Void},Ptr{Ptr{Uint8}},Cint,Cint,Ptr{Uint8}), jm.ji, names, length(names), thin, "trace")
+  if !status; warn("monitors not set"); end
 end
 
 function clear_monitors(jm::JAGSModel)
