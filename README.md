@@ -22,6 +22,6 @@ Basic statistics are calculated using "coef" and some simple graphs
 are created in the example using package SixelGraphics, which is
 admittedly obscure, but handy with some terminals (see "example.png").
 
-Installation:
-Pkg.clone("git://github.com/olofsen/JAGS.jl")
+Installation:  
+Pkg.clone("git://github.com/olofsen/JAGS.jl")  
 Pkg.clone("git://github.com/olofsen/SixelGraphics.jl")
