@@ -9,7 +9,6 @@
 #include <Module.h>
 #include <Console.h>
 #include <version.h>
-//#include <ltdl.h>
 
 using namespace std;
 
