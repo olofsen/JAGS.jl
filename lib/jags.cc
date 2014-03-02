@@ -9,7 +9,7 @@
 #include <Module.h>
 #include <Console.h>
 #include <version.h>
-#include <ltdl.h>
+//#include <ltdl.h>
 
 using namespace std;
 
@@ -21,8 +21,6 @@ struct jags_info {
   Console *console;
   map<string, SArray> *table;
 };
-
-deque<lt_dlhandle> _dyn_lib;
 
 static void printMessages(bool status)
 {
@@ -68,10 +66,6 @@ void clear_console(void *ji)
 
 void *make_console()
 {
-  if (lt_dlinit()) {
-      std::cerr << lt_dlerror() << std::endl;
-      return NULL;
-  }
   jags_info *ji = new jags_info;
   ji->console = new Console(jags_out, jags_err);
   ji->table = new map<string, SArray>;
@@ -209,23 +203,14 @@ int get_nchain(void *ji)
 
 bool load_module(const char *name)
 {
-  std::cout << "Loading module: " << name;
-  lt_dlhandle mod = lt_dlopenext(name);
-  if (mod == NULL) {
-    std::cout << ": " << lt_dlerror() << std::endl;
-    return false;
-  } else {
-    std::cout << ": ok" << std::endl;
-    _dyn_lib.push_front(mod);
-    list<Module*>::const_iterator it;
-    for (it = Module::modules().begin(); it != Module::modules().end(); ++it) {
-      if ((*it)->name() == name) {
-        (*it)->load();
-        return true;
-      }
+  list<Module*>::const_iterator it;
+  for (it = Module::modules().begin(); it != Module::modules().end(); ++it) {
+    if ((*it)->name() == name) {
+      (*it)->load();
+      return true;
     }
-    return false;
   }
+  return false;
 }
 
 int get_modules_size()
