@@ -3,8 +3,7 @@ JAGS.jl: A Julia interface to JAGS
 The package provides a shared library as an interface between Julia
 and JAGS, just like "rjags".  The script "make.sh" should be run (in "lib")
 to compile the library and tell the package where to find JAGS's modules.
-Modules are currently loaded using "libltdl", but perhaps this is not
-necessary (rjags does not seem to need this).
+Modules are currently loaded using "libltdl", as does JAGS's terminal.
 
 The types and methods defined in "JAGS.jl" are best illustrated with
 (and were at present only tested with) the example in the "test" directory.
@@ -27,6 +26,6 @@ Installation:
 <ul>
 <li>Pkg.clone("git://github.com/olofsen/JAGS.jl")</li>
 <li>Pkg.clone("git://github.com/olofsen/SixelGraphics.jl")</li>
-<li>Install libltdl, development version with headers</li>
+<li>Install libltdl</li>
 <li>Run make.sh in lib</li>
 </ul>
