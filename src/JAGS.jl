@@ -12,8 +12,8 @@ type JAGSLibrary
   ji::Ptr{Void}
   function JAGSLibrary()
     if ccall( (:lt_dlinit, :libltdl), Bool, ()); error("unable to initialize libltdl"); end
-    ji = ccall( (:make_console, shlib), Ptr{Void}, ())
     ccall( (:lt_dladdsearchdir, "libltdl"), Cint, (Ptr{Uint8},), modpath)
+    ji = ccall( (:make_console, shlib), Ptr{Void}, ())
     println("Linked to JAGS ", get_version())
     load_module("basemod")
     load_module("bugs")
