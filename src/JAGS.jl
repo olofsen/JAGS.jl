@@ -11,6 +11,7 @@ include("modpath.jl")
 type JAGSLibrary
   ji::Ptr{Void}
   function JAGSLibrary()
+    if ccall( (:lt_dlinit, :libltdl), Bool, ()); error("unable to initialize libltdl"); end
     ji = ccall( (:make_console, shlib), Ptr{Void}, ())
     ccall( (:lt_dladdsearchdir, "libltdl"), Cint, (Ptr{Uint8},), modpath)
     println("Linked to JAGS ", get_version())
@@ -108,7 +109,21 @@ end
 # modules
 
 function load_module(name::ASCIIString)
-  ccall( (:load_module, shlib), Bool, (Ptr{Uint8},), name)
+  status::Bool
+  h::Ptr{Void}
+  print("Loading module: ",name,':')
+  h = ccall( (:lt_dlopenext, :libltdl), Ptr{Void}, (Ptr{Uint8},), name)
+  if h==convert(Ptr{Void}, 0)
+    println(" failed")
+    return false
+  end
+  status = ccall( (:load_module, shlib), Bool, (Ptr{Uint8},), name)
+  if !status
+    println(" failed")
+    return false
+  end
+  println(" ok")
+  return true
 end
 
 function get_modules_size()
