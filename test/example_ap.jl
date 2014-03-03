@@ -8,10 +8,10 @@ nobs = size(d,1)
 ids = iround(d[:,1])
 nid = ids[end]
 
-set_data(jm,"ID",d[:,1])
-set_data(jm,"DV",d[:,2]-d[:,3])
-set_data(jm,"NOBS",nobs)
-set_data(jm,"NID",nid)
+set_data(jm,:ID,d[:,1])
+set_data(jm,:DV,d[:,2]-d[:,3])
+set_data(jm,:NOBS,nobs)
+set_data(jm,:NID,nid)
 
 compile(jm)
 print_variable_names(jm)
@@ -22,7 +22,7 @@ set_monitors(jm,["uloa" "mu" "lloa"], thin=100)
 update(jm,6000) # considering resolution
 
 println("\nStatistics of the monitored values:")
-sm = coef(jm)
+sm = get_stats(jm)
 showcompact(sm)
 println("")
 

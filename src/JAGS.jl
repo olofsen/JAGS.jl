@@ -1,23 +1,24 @@
 module JAGS
 
-export JAGSLibrary, JAGSModel, set_data, compile, initialize, update, print_variable_names,
+export JAGSLibrary, JAGSModel, set_data, compile, initialize,
+       is_adapting, check_adaptation, adapt, update, print_variable_names,
+       set_init, set_inits,
        set_monitors, clear_monitors, get_monitors_size, get_monitor_name,
-       get_monitor_iter, get_monitored_values, print_monitor_names,
-       print_module_names, coef, get_iter, get_nchain
+       get_monitor_iter, get_monitor_nvalue, get_monitored_values, print_monitor_names,
+       print_module_names, get_stats, get_iter, get_nchain
 
 const shlib = joinpath(Pkg.dir("JAGS"),"lib/jags.so")
 include("modpath.jl")
 
 type JAGSLibrary
-  ji::Ptr{Void}
+  jc::Ptr{Void}
   function JAGSLibrary()
     if ccall( (:lt_dlinit, :libltdl), Bool, ()); error("unable to initialize libltdl"); end
     ccall( (:lt_dladdsearchdir, "libltdl"), Cint, (Ptr{Uint8},), modpath)
-    ji = ccall( (:make_console, shlib), Ptr{Void}, ())
     println("Linked to JAGS ", get_version())
     load_module("basemod")
     load_module("bugs")
-    new(ji)
+    new(convert(Ptr{Void}, 0))
   end
 end
 
@@ -27,7 +28,14 @@ type JAGSModel
   nchain::Int
   status::Symbol
   JAGSModel(jl::JAGSLibrary, filnam::ASCIIString; nchain=1) =
-    new(jl.ji, filnam, nchain, :assigned)
+    new(make_console(jl), filnam, nchain, :assigned)
+end
+
+function make_console(jl::JAGSLibrary)
+  if jl.jc!=convert(Ptr{Void}, 0)
+    ccall( (:clear_console, shlib), Void, (Ptr{Void},), jl.jc)
+  end
+  jl.jc = ccall( (:make_console, shlib), Ptr{Void}, ())
 end
 
 function check_model(jm::JAGSModel)
@@ -44,66 +52,80 @@ function compile(jm::JAGSModel)
   if status; jm.status=:model_compiled; end
 end
 
-function adapt(jm::JAGSModel, nadapt::Int)
-  status::Bool
-  status = false
-  if is_adapting(jm)
-    jm.status = :adapting
-    status = update(jm, nadapt, adapting=true)
-    if status
-      status = check_adaptation(jm)
-    end
-  else
-    status = true
-  end
-  return status
-end
-
-function initialize(jm::JAGSModel; nadapt=1000)
+function initialize(jm::JAGSModel)
   status::Bool
   if jm.status!=:model_compiled; return; end
   status = ccall( (:initialize, shlib), Bool, (Ptr{Void},), jm.ji)
-  if nadapt>0; status = adapt(jm, nadapt); end
   if status; jm.status=:model_initialized; end
-  return status
 end
 
-function update(jm::JAGSModel, niter::Int; adapting=false)
-  if adapting
-    if jm.status!=:model_compiled; return; end
+function update(jm::JAGSModel, niter::Int)
+  status::Bool
+  if is_adapting(jm)
+    niter2 = div(niter,2)
+    status = update(jm, niter2, true)
+    if !status; return status; end
+    if !check_adaptation(jm); warn("Adaptation incomplete"); end
+    adapt_off(jm)
+    status = update(jm, niter-niter2, false)
+    if !status; return status; end
   else
-    if jm.status!=:model_initialized; return; end
+    status = update(jm, niter, false)
+    if !status; return status; end
   end
+  jm.status = :model_burnt_in
+  return true
+end
+
+function update(jm::JAGSModel, niter::Int, adapting::Bool)
   if adapting; mode="Adapting"; else mode="Updating"; end
   status = true
   i = 0
-  istep = iround(niter/100)
-  idone = 0
-  iiter = istep
-  while idone<niter
-    if idone+istep>niter; iiter=niter-idone; end
-    print('\r',mode,": ",i,'%')
-    status = ccall( (:update, shlib), Bool, (Ptr{Void},Cint), jm.ji, iiter)
-    if !status; break; end
-    idone += iiter
-    i += 1
+  if niter>=100
+    istep = iround(niter/100)
+    iiter = istep
+    idone = 0
+    while idone<niter
+      if idone+istep>niter; iiter=niter-idone; end
+      print('\r',mode,": ",i,'%')
+      status = ccall( (:update, shlib), Bool, (Ptr{Void},Cint), jm.ji, iiter)
+      if !status; break; end
+      idone += iiter
+      i += 1
+    end
+    println('\r',mode,": ",i,"% done")
+  else
+    status = ccall( (:update, shlib), Bool, (Ptr{Void},Cint), jm.ji, niter)
+    idone = niter
+    println(mode,": done")
   end
-  println('\r',mode,": ",i,"% done")
-  return idone
+  return status
 end
 
 # data
 
-function set_data(jm::JAGSModel, name::ASCIIString, value::Int)
-  ccall( (:to_sarray, shlib), Void, (Ptr{Void},Ptr{Uint8},Ptr{Cdouble},Cint), jm.ji, name, &value, 1)
+function set_data(jm::JAGSModel, name::Symbol, value::Int64)
+  ccall( (:to_sarray, shlib), Void, (Ptr{Void},Ptr{Uint8},Ptr{Cdouble},Cint), jm.ji, string(name), &value, 1)
 end
 
-function set_data(jm::JAGSModel, name::ASCIIString, value::Real)
-  ccall( (:to_sarray, shlib), Void, (Ptr{Void},Ptr{Uint8},Ptr{Cdouble},Cint), jm.ji, name, &value, 1)
+function set_data(jm::JAGSModel, name::Symbol, value::Float64)
+  ccall( (:to_sarray, shlib), Void, (Ptr{Void},Ptr{Uint8},Ptr{Cdouble},Cint), jm.ji, string(name), &value, 1)
 end
 
-function set_data(jm::JAGSModel, name::ASCIIString, values::Array{Float64})
-  ccall( (:to_sarray, shlib), Void, (Ptr{Void},Ptr{Uint8},Ptr{Cdouble},Cint), jm.ji, name, values, length(values))
+function set_data(jm::JAGSModel, name::Symbol, values::Array{Int64})
+  ccall( (:to_sarray, shlib), Void, (Ptr{Void},Ptr{Uint8},Ptr{Cdouble},Cint), jm.ji, string(name), convert(Array{Cdouble},values), length(values))
+end
+
+function set_data(jm::JAGSModel, name::Symbol, values::Array{Float64})
+  ccall( (:to_sarray, shlib), Void, (Ptr{Void},Ptr{Uint8},Ptr{Cdouble},Cint), jm.ji, string(name), values, length(values))
+end
+
+function set_data(jm::JAGSModel, name::Symbol, values::Array{Float64}, na::BitArray{1})
+  ccall( (:to_sarray_na, shlib), Void, (Ptr{Void},Ptr{Uint8},Ptr{Cdouble},Ptr{Bool},Cint), jm.ji, string(name), values, convert(Array{Cint},na), length(values))
+end
+
+function set_data(jm::JAGSModel, name::Symbol, values::Array{Int64}, na::BitArray{1})
+  ccall( (:to_sarray_na, shlib), Void, (Ptr{Void},Ptr{Uint8},Ptr{Cdouble},Ptr{Bool},Cint), jm.ji, string(name), convert(Array{Cdouble},values), convert(Array{Cint},na), length(values))
 end
 
 # modules
@@ -162,13 +184,27 @@ function print_variable_names(jm::JAGSModel)
   println('\n')
 end
 
+# inits
+
+function set_init(jm::JAGSModel, name::Symbol, value::Float64)
+  ccall( (:to_parameter_sarray, shlib), Void, (Ptr{Void},Ptr{Uint8},Ptr{Cdouble},Cint), jm.ji, string(name), &value, 1)
+end
+
+function set_init(jm::JAGSModel, name::Symbol, values::Array{Float64})
+  ccall( (:to_parameter_sarray, shlib), Void, (Ptr{Void},Ptr{Uint8},Ptr{Cdouble},Cint), jm.ji, string(name), values, length(values))
+end
+
+function set_inits(jm::JAGSModel)
+  status::Bool
+  status = ccall( (:set_parameters, shlib), Bool, (Ptr{Void},Cint), jm.ji, get_nchain(jm))
+end
+
 # monitors (default range and types "trace")
 
 function set_monitors(jm::JAGSModel, names::Array{ASCIIString}; thin=1)
   status::Bool
-  if jm.status!=:model_initialized; return false; end
+  if jm.status!=:model_burnt_in; warn("model is not burnt-in"); end
   status = ccall( (:set_monitors, shlib), Bool, (Ptr{Void},Ptr{Ptr{Uint8}},Cint,Cint,Ptr{Uint8}), jm.ji, names, length(names), thin, "trace")
-  if !status; warn("monitors not set"); end
 end
 
 function clear_monitors(jm::JAGSModel)
@@ -191,17 +227,31 @@ function get_monitor_iter(jm::JAGSModel, i::Int)
   iter = ccall( (:get_monitor_iter, shlib), Cint, (Ptr{Void},Cint), jm.ji, i-1)
 end
 
+function get_monitor_nvalue(jm::JAGSModel, i::Int)
+  nvalue::Int
+  nvalue = ccall( (:get_monitor_nvalue, shlib), Cint, (Ptr{Void},Cint), jm.ji, i-1)
+end
+
 function get_monitors_size(jm::JAGSModel)
-  if jm.status!=:model_initialized; return 0; end
+  if jm.status!=:model_burnt_in; return 0; end
   return ccall( (:get_monitors_size, shlib), Cint, (Ptr{Void},), jm.ji)
 end
 
 function get_monitored_values(jm::JAGSModel, i::Int, ichain::Int)
   p::Ptr{Cdouble}
   iter::Int
+  nvalue::Int
+  m::Int
   iter = get_monitor_iter(jm, i)
+  nvalue = get_monitor_nvalue(jm, i)
   p = ccall( (:get_monitored_values, shlib), Ptr{Cdouble}, (Ptr{Void},Cint,Cint), jm.ji, i-1, ichain-1)
-  return pointer_to_array(p, iter, false)
+  pa = pointer_to_array(p, nvalue, false)
+  if nvalue==iter
+    return pa
+  else
+    m = div(nvalue,iter)
+    return reshape(pa,m,iter)
+  end
 end
 
 function print_monitor_names(jm::JAGSModel)
@@ -212,16 +262,28 @@ function print_monitor_names(jm::JAGSModel)
   println('\n')
 end
 
-function coef(jm::JAGSModel, i::Int, chain::Int)
-  v = get_monitored_values(jm,i,chain)
-  [mean(v) std(v) quantile(v,0.025) quantile(v,0.5) quantile(v,0.975)]
+function get_stats(v::Array{Float64})
+  [length(v) mean(v[:]) std(v[:]) quantile(v[:],0.025) quantile(v[:],0.5) quantile(v[:],0.975)]
 end
 
-function coef(jm::JAGSModel; chain=1)
-  { get_monitor_name(jm,i) => coef(jm,i,chain) for i=1:get_monitors_size(jm) }
+function get_stats(jm::JAGSModel, i::Int, ichain::Int)
+  v = get_monitored_values(jm,i,ichain)
+  get_stats(v)
+end
+
+function get_stats(jm::JAGSModel; ichain=1)
+  { get_monitor_name(jm,i) => get_stats(jm,i,ichain) for i=1:get_monitors_size(jm) }
 end
 
 # adaptation
+
+function adapt(jm::JAGSModel, nadapt::Int)
+  if is_adapting(jm)
+    update(jm, nadapt, true)
+  else
+    warn("model is not adapting")
+  end
+end
 
 function check_adaptation(jm::JAGSModel)
   status::Bool

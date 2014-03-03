@@ -9,6 +9,7 @@
 #include <Module.h>
 #include <Console.h>
 #include <version.h>
+#include <util/nainf.h>
 
 using namespace std;
 
@@ -19,6 +20,7 @@ static bool quiet=false; //Suppress information messages
 struct jags_info {
   Console *console;
   map<string, SArray> *table;
+  map<string, SArray> *inits;
 };
 
 static void printMessages(bool status)
@@ -60,6 +62,7 @@ void clear_console(void *ji)
 {
   delete static_cast<jags_info*>(ji)->console;
   delete static_cast<jags_info*>(ji)->table;
+  delete static_cast<jags_info*>(ji)->inits;
   delete static_cast<jags_info*>(ji);
 }
 
@@ -68,6 +71,7 @@ void *make_console()
   jags_info *ji = new jags_info;
   ji->console = new Console(jags_out, jags_err);
   ji->table = new map<string, SArray>;
+  ji->inits = new map<string, SArray>;
   return static_cast<void*>(ji);
 }
 
@@ -92,6 +96,38 @@ void to_sarray(void *ji, const char *name, double *data, const int n)
   SArray sarray(vector<unsigned int>(1, n));
   for (int i=0; i<n; i++) sarray.setValue(data[i],i);
   table.insert(pair<string,SArray>(ename, sarray));  
+}
+
+void to_sarray_na(void *ji, const char *name, double *data, int *na, const int n)
+{
+  map<string, SArray> &table = *static_cast<jags_info*>(ji)->table;
+  string ename = name;
+  SArray sarray(vector<unsigned int>(1, n));
+  for (int i=0; i<n; i++)
+    if (na[i])
+      sarray.setValue(JAGS_NA,i);
+    else
+      sarray.setValue(data[i],i);
+  table.insert(pair<string,SArray>(ename, sarray));  
+}
+
+void to_parameter_sarray(void *ji, const char *name, double *data, const int n)
+{
+  map<string, SArray> &table = *static_cast<jags_info*>(ji)->inits;
+  string ename = name;
+  SArray sarray(vector<unsigned int>(1, n));
+  for (int i=0; i<n; i++) sarray.setValue(data[i],i);
+  table.insert(pair<string,SArray>(ename, sarray));  
+}
+
+bool set_parameters(void *ji, const int nchain)
+{
+  map<string, SArray> &data_table = *static_cast<jags_info*>(ji)->inits;
+  Console &console = *static_cast<jags_info*>(ji)->console;
+
+  bool status = console.setParameters(data_table, nchain);
+  printMessages(status);
+  return status;
 }
 
 bool compile(void *ji, int nchain, bool gendata)
@@ -151,6 +187,7 @@ bool set_monitors(void *ji, char **names, int nnames, int thin, char *type)
   int i;
   for (i=0; i<nnames; i++) {
     status = static_cast<jags_info*>(ji)->console->setMonitor(names[i], Range(), thin, type);
+    printMessages(true);
     if (!status) return status;
   }
   return true;
@@ -180,6 +217,14 @@ int get_monitor_iter(void *ji, const int i)
   list<MonitorControl>::const_iterator it = monitors.begin();
   advance(it, i);
   return it->niter();
+}
+
+int get_monitor_nvalue(void *ji, const int i)
+{
+  list<MonitorControl> const &monitors = static_cast<jags_info*>(ji)->console->model()->monitors();
+  list<MonitorControl>::const_iterator it = monitors.begin();
+  advance(it, i);
+  return it->monitor()->value(0).size();
 }
 
 const double *get_monitored_values(void *ji, const int i, const int ichain)
