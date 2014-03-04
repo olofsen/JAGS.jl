@@ -65,7 +65,7 @@ function update(jm::JAGSModel, niter::Int)
     niter2 = div(niter,2)
     status = update(jm, niter2, true)
     if !status; return status; end
-    if !check_adaptation(jm); warn("Adaptation incomplete"); end
+    if !check_adaptation(jm); warn("adaptation incomplete"); end
     adapt_off(jm)
     status = update(jm, niter-niter2, false)
     if !status; return status; end
