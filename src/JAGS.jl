@@ -330,7 +330,8 @@ function get_iter(jm::JAGSModel)
 end
 
 function get_nchain(jm::JAGSModel)
-  return ccall( (:get_nchain, shlib), Cint, (Ptr{Void},), jm.ji)
+  nchain::Int
+  nchain = ccall( (:get_nchain, shlib), Cint, (Ptr{Void},), jm.ji)
 end
 
 function get_version()
