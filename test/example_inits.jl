@@ -37,7 +37,7 @@ compile(jm)
 set_inits(jm,inits)
 initialize(jm)
 set_monitors(jm,["mu"])
-update(jm,10)
+update(jm,10,false)
 
 v = get_monitored_values(jm,1,1)
 s = sixelplot(v,showsixels=false)

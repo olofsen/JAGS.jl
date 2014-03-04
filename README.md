@@ -26,7 +26,7 @@ are created in the example using package SixelGraphics, which is
 admittedly obscure, but handy with some terminals. See "example.png",
 or the ASCIIPlots version.
 
-Installation:
+Installation (under Linux):
 <ul>
 <li>Pkg.clone("git://github.com/olofsen/JAGS.jl")</li>
 <li>Optionally add "DataFrames"</li>

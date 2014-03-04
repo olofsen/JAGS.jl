@@ -1,11 +1,11 @@
 module JAGS
 
-export JAGSLibrary, JAGSModel, set_data, compile, initialize,
+export JAGSLibrary, JAGSModel, load_module, set_data, compile, initialize,
        is_adapting, check_adaptation, adapt, update, print_variable_names,
        set_init, set_inits,
        set_monitors, clear_monitors, get_monitors_size, get_monitor_name,
        get_monitor_iter, get_monitor_nvalue, get_monitored_values, print_monitor_names,
-       print_module_names, get_stats, get_iter, get_nchain
+       print_module_names, get_stats, dic, get_iter, get_nchain
 
 const shlib = joinpath(Pkg.dir("JAGS"),"lib/jags.so")
 include("modpath.jl")
@@ -199,12 +199,12 @@ function set_inits(jm::JAGSModel)
   status = ccall( (:set_parameters, shlib), Bool, (Ptr{Void},Cint), jm.ji, get_nchain(jm))
 end
 
-# monitors (default range and types "trace")
+# monitors
 
-function set_monitors(jm::JAGSModel, names::Array{ASCIIString}; thin=1)
+function set_monitors(jm::JAGSModel, names::Array{ASCIIString}; thin=1, mtype="trace")
   status::Bool
   if jm.status!=:model_burnt_in; warn("model is not burnt-in"); end
-  status = ccall( (:set_monitors, shlib), Bool, (Ptr{Void},Ptr{Ptr{Uint8}},Cint,Cint,Ptr{Uint8}), jm.ji, names, length(names), thin, "trace")
+  status = ccall( (:set_monitors, shlib), Bool, (Ptr{Void},Ptr{Ptr{Uint8}},Cint,Cint,Ptr{Uint8}), jm.ji, names, length(names), thin, mtype)
 end
 
 function clear_monitors(jm::JAGSModel)
@@ -213,8 +213,8 @@ function clear_monitors(jm::JAGSModel)
   end
 end
 
-function clear_monitor(jm::JAGSModel, name::ASCIIString)
-  ccall( (:clear_monitor, shlib), Void, (Ptr{Void},Ptr{Uint8},Ptr{Uint8}), jm.ji, name, "trace")
+function clear_monitor(jm::JAGSModel, name::ASCIIString; mtype="trace")
+  ccall( (:clear_monitor, shlib), Void, (Ptr{Void},Ptr{Uint8},Ptr{Uint8}), jm.ji, name, mtype)
 end
 
 function get_monitor_name(jm::JAGSModel, i::Int)
@@ -246,7 +246,7 @@ function get_monitored_values(jm::JAGSModel, i::Int, ichain::Int)
   nvalue = get_monitor_nvalue(jm, i)
   p = ccall( (:get_monitored_values, shlib), Ptr{Cdouble}, (Ptr{Void},Cint,Cint), jm.ji, i-1, ichain-1)
   pa = pointer_to_array(p, nvalue, false)
-  if nvalue==iter
+  if nvalue<=iter
     return pa
   else
     m = div(nvalue,iter)
@@ -263,7 +263,7 @@ function print_monitor_names(jm::JAGSModel)
 end
 
 function get_stats(v::Array{Float64})
-  [length(v) mean(v[:]) std(v[:]) quantile(v[:],0.025) quantile(v[:],0.5) quantile(v[:],0.975)]
+  {:length=>length(v), :mean=>mean(v[:]), :std=>std(v[:]), :qlo=>quantile(v[:],0.025), :median=>quantile(v[:],0.5), :qhi=>quantile(v[:],0.975)}
 end
 
 function get_stats(jm::JAGSModel, i::Int, ichain::Int)
@@ -297,6 +297,29 @@ end
 
 function adapt_off(jm::JAGSModel)
   ccall( (:adapt_off, shlib), Void, (Ptr{Void},), jm.ji)
+end
+
+# dic
+
+function dic(jm::JAGSModel, niter::Int; ptype="popt")
+  p = convert(Ptr{Cdouble}, 0)
+  iter::Int
+  iter = 0  
+  deviance = 0.
+  penalty = 0.
+  set_monitors(jm, ["deviance" ptype], mtype="mean")
+  update(jm, niter)
+  for i=1:get_monitors_size(jm)
+    name = get_monitor_name(jm,i)
+    if name=="deviance"
+      deviance = sum(get_monitored_values(jm,i,1))
+      clear_monitor(jm, name)
+    elseif name==ptype
+      penalty = sum(get_monitored_values(jm,i,1))
+      clear_monitor(jm, name)
+    end
+  end
+  {:deviance=>deviance, :penalty=>penalty, :penalized_deviance=>deviance+penalty}
 end
 
 # miscellaneous
